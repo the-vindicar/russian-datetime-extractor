@@ -189,12 +189,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2024-01-01 00:00",
         }
     ),  # 1
+    "день тому назад": (
+        DateTimeObj(day_delta=-2),
+        {
+            BindType.FUTURE: "2023-12-28 00:00",
+            BindType.PAST: "2023-12-28 00:00",
+            BindType.CLOSEST: "2023-12-28 00:00",
+        }
+    ),  # 1
     "через 2 дня": (
         DateTimeObj(day_delta=3),
         {
             BindType.FUTURE: "2024-01-02 00:00",
             BindType.PAST: "2024-01-02 00:00",
             BindType.CLOSEST: "2024-01-02 00:00",
+        }
+    ),  # 1
+    "2 дня назад": (
+        DateTimeObj(day_delta=-3),
+        {
+            BindType.FUTURE: "2023-12-27 00:00",
+            BindType.PAST: "2023-12-27 00:00",
+            BindType.CLOSEST: "2023-12-27 00:00",
         }
     ),  # 1
     "спустя трое суток": (
@@ -245,12 +261,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2024-01-06 00:00",
         }
     ),
+    "неделю назад": (
+        DateTimeObj(day_delta=-7),
+        {
+            BindType.FUTURE: "2023-12-23 00:00",
+            BindType.PAST: "2023-12-23 00:00",
+            BindType.CLOSEST: "2023-12-23 00:00",
+        }
+    ),
     "через 2 недели": (
         DateTimeObj(day_delta=14),
         {
             BindType.FUTURE: "2024-01-13 00:00",
             BindType.PAST: "2024-01-13 00:00",
             BindType.CLOSEST: "2024-01-13 00:00",
+        }
+    ),
+    "2 недели тому назад": (
+        DateTimeObj(day_delta=-14),
+        {
+            BindType.FUTURE: "2023-12-16 00:00",
+            BindType.PAST: "2023-12-16 00:00",
+            BindType.CLOSEST: "2023-12-16 00:00",
         }
     ),
     "спустя три недели": (
@@ -261,12 +293,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2024-01-20 00:00",
         }
     ),
+    "три недели назад": (
+        DateTimeObj(day_delta=-21),
+        {
+            BindType.FUTURE: "2023-12-09 00:00",
+            BindType.PAST: "2023-12-09 00:00",
+            BindType.CLOSEST: "2023-12-09 00:00",
+        }
+    ),
     "через месяц": (
         DateTimeObj(month_delta=1),
         {
             BindType.FUTURE: "2024-01-30 00:00",
             BindType.PAST: "2024-01-30 00:00",
             BindType.CLOSEST: "2024-01-30 00:00",
+        }
+    ),
+    "месяц назад": (
+        DateTimeObj(month_delta=-1),
+        {
+            BindType.FUTURE: "2023-11-30 00:00",
+            BindType.PAST: "2023-11-30 00:00",
+            BindType.CLOSEST: "2023-11-30 00:00",
         }
     ),
     "через 2 месяца": (
@@ -277,12 +325,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2024-03-01 00:00",
         }
     ),  # не бывает 02-30
+    "2 месяца тому назад": (
+        DateTimeObj(month_delta=-2),
+        {
+            BindType.FUTURE: "2023-10-30 00:00",
+            BindType.PAST: "2023-10-30 00:00",
+            BindType.CLOSEST: "2023-10-30 00:00",
+        }
+    ),
     "спустя три месяца": (
         DateTimeObj(month_delta=3),
         {
             BindType.FUTURE: "2024-03-30 00:00",
             BindType.PAST: "2024-03-30 00:00",
             BindType.CLOSEST: "2024-03-30 00:00",
+        }
+    ),
+    "три месяца назад": (
+        DateTimeObj(month_delta=-3),
+        {
+            BindType.FUTURE: "2023-09-30 00:00",
+            BindType.PAST: "2023-09-30 00:00",
+            BindType.CLOSEST: "2023-09-30 00:00",
         }
     ),
     "через пять минут": (
@@ -293,12 +357,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2023-12-30 14:05",
         }
     ),
+    "пять минут назад": (
+        DateTimeObj(minute_delta=-5),
+        {
+            BindType.FUTURE: "2023-12-30 13:55",
+            BindType.PAST: "2023-12-30 13:55",
+            BindType.CLOSEST: "2023-12-30 13:55",
+        }
+    ),
     "через час": (
         DateTimeObj(hour_delta=1),
         {
             BindType.FUTURE: "2023-12-30 15:00",
             BindType.PAST: "2023-12-30 15:00",
             BindType.CLOSEST: "2023-12-30 15:00",
+        }
+    ),
+    "час назад": (
+        DateTimeObj(hour_delta=-1),
+        {
+            BindType.FUTURE: "2023-12-30 13:00",
+            BindType.PAST: "2023-12-30 13:00",
+            BindType.CLOSEST: "2023-12-30 13:00",
         }
     ),
     "через 2 часа": (
@@ -309,12 +389,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2023-12-30 16:00",
         }
     ),
+    "2 часа назад": (
+        DateTimeObj(hour_delta=-2),
+        {
+            BindType.FUTURE: "2023-12-30 12:00",
+            BindType.PAST: "2023-12-30 12:00",
+            BindType.CLOSEST: "2023-12-30 12:00",
+        }
+    ),
     "спустя три часа": (
         DateTimeObj(hour_delta=3),
         {
             BindType.FUTURE: "2023-12-30 17:00",
             BindType.PAST: "2023-12-30 17:00",
             BindType.CLOSEST: "2023-12-30 17:00",
+        }
+    ),
+    "три часа назад": (
+        DateTimeObj(hour_delta=-3),
+        {
+            BindType.FUTURE: "2023-12-30 11:00",
+            BindType.PAST: "2023-12-30 11:00",
+            BindType.CLOSEST: "2023-12-30 11:00",
         }
     ),
     "через два с половиной часа": (
@@ -325,12 +421,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2023-12-30 16:30",
         }
     ),
+    "два с половиной часа тому назад": (
+        DateTimeObj(hour_delta=-2, minute_delta=-30),
+        {
+            BindType.FUTURE: "2023-12-30 11:30",
+            BindType.PAST: "2023-12-30 11:30",
+            BindType.CLOSEST: "2023-12-30 11:30",
+        }
+    ),
     "спустя 2 часа 30 минут": (
         DateTimeObj(hour_delta=2, minute_delta=30),
         {
             BindType.FUTURE: "2023-12-30 16:30",
             BindType.PAST: "2023-12-30 16:30",
             BindType.CLOSEST: "2023-12-30 16:30",
+        }
+    ),
+    "2 часа 30 минут назад": (
+        DateTimeObj(hour_delta=-2, minute_delta=-30),
+        {
+            BindType.FUTURE: "2023-12-30 11:30",
+            BindType.PAST: "2023-12-30 11:30",
+            BindType.CLOSEST: "2023-12-30 11:30",
         }
     ),
     "в час дня": (
@@ -621,12 +733,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2024-12-30 00:00",
         }
     ),
+    "год назад": (
+        DateTimeObj(year_delta=-1),
+        {
+            BindType.FUTURE: "2022-12-30 00:00",
+            BindType.PAST: "2022-12-30 00:00",
+            BindType.CLOSEST: "2022-12-30 00:00",
+        }
+    ),
     "через 5 лет": (
         DateTimeObj(year_delta=5),
         {
             BindType.FUTURE: "2028-12-30 00:00",
             BindType.PAST: "2028-12-30 00:00",
             BindType.CLOSEST: "2028-12-30 00:00",
+        }
+    ),
+    "5 лет назад": (
+        DateTimeObj(year_delta=-5),
+        {
+            BindType.FUTURE: "2018-12-30 00:00",
+            BindType.PAST: "2018-12-30 00:00",
+            BindType.CLOSEST: "2018-12-30 00:00",
         }
     ),
     "спустя три года": (
@@ -637,12 +765,28 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
             BindType.CLOSEST: "2026-12-30 00:00",
         }
     ),
+    "три года тому назад": (
+        DateTimeObj(year_delta=-3),
+        {
+            BindType.FUTURE: "2020-12-30 00:00",
+            BindType.PAST: "2020-12-30 00:00",
+            BindType.CLOSEST: "2020-12-30 00:00",
+        }
+    ),
     "через год, 2 месяца, 3 дня и 12 часов": (
         DateTimeObj(year_delta=1, month_delta=2, day_delta=4, hour_delta=12),
         {
             BindType.FUTURE: "2025-03-06 02:00",
             BindType.PAST: "2025-03-06 02:00",
             BindType.CLOSEST: "2025-03-06 02:00",
+        }
+    ),  # 1
+    "год, 2 месяца, 3 дня и 12 часов назад": (
+        DateTimeObj(year_delta=-1, month_delta=-2, day_delta=-4, hour_delta=-12),
+        {
+            BindType.FUTURE: "2022-10-26 02:00",
+            BindType.PAST: "2022-10-26 02:00",
+            BindType.CLOSEST: "2022-10-26 02:00",
         }
     ),  # 1
 }

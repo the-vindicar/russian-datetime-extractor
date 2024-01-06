@@ -17,6 +17,7 @@ def bind_reference(fact: DateTimeObj, direction: BindType, origin: datetime) -> 
     ищет подходящую дату/время в будущем, а не в прошлом.
 
     :param fact: Описание факта, извлечённого из текста на естественном языке.
+    :param direction: В каком направлении следует искать подходящую дату для неоднозначных описаний.
     :param origin: Точка отсчёта времени для неполных или относительных описаний ("пятого числа", "через час").
     :raises ValueError: Если полученный факт невозможно интерпретировать однозначно.
     :return: Точное указание на дату/время, а также флаг наличия времени.
@@ -177,12 +178,12 @@ def _bind_relative(fact: DateTimeObj, origin: datetime) -> datetime:
     try:
         target: datetime = origin.replace(
             year=origin.year + dyear + (dmonth + origin.month - 1) // 12,
-            month=(dmonth + origin.month - 1) % 12 + (1 if dmonth >= 0 else 0)
+            month=(dmonth + origin.month - 1 + 12) % 12 + 1
         )
     except ValueError:  # 31 января + через месяц = ~1 марта а не 31 февраля
         target: datetime = origin.replace(
             year=origin.year + dyear + (dmonth + origin.month - 1) // 12,
-            month=(origin.month - 1 + dmonth) % 12 + (2 if dmonth >= 0 else 1),
+            month=(origin.month - 1 + dmonth + 12) % 12 + 2,
             day=1
         )
     target = target + timedelta(

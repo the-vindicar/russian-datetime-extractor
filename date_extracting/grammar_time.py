@@ -10,7 +10,7 @@ from yargy.predicates import (
 from .facts import *
 from .words import *
 
-__all__ = ['AFTER_SOME_TIME', 'TIME']
+__all__ = ['AFTER_SOME_TIME', 'SOME_TIME_AGO', 'TIME']
 
 
 HOUR_DELTA_DIGITS = gte(1).interpretation(
@@ -27,6 +27,22 @@ MINUTE_DELTA_DIGITS = gte(1).interpretation(
 
 MINUTE_DELTA_WORDS = dictionary(WORD_COUNTS).interpretation(
     DateTimeFact.minute_delta.normalized().custom(WORD_COUNTS.__getitem__)
+)
+
+HOUR_DELTA_DIGITS_NEG = gte(1).interpretation(
+    DateTimeFact.hour_delta.custom(lambda s: -int(s))
+)
+
+HOUR_DELTA_WORDS_NEG = morph_pipeline(WORD_COUNTS).interpretation(
+    DateTimeFact.hour_delta.normalized().custom(lambda s: -WORD_COUNTS[s])
+)
+
+MINUTE_DELTA_DIGITS_NEG = gte(1).interpretation(
+    DateTimeFact.minute_delta.custom(lambda s: -int(s))
+)
+
+MINUTE_DELTA_WORDS_NEG = morph_pipeline(WORD_COUNTS).interpretation(
+    DateTimeFact.minute_delta.normalized().custom(lambda s: -WORD_COUNTS[s])
 )
 
 HOUR_COUNT_DIGITS = and_(gte(0), lte(23)).interpretation(
@@ -106,6 +122,47 @@ AFTER_SOME_TIME = rule(
         # просто "через минуту"
         morph_pipeline(WORD_MINUTE).interpretation(
             DateTimeFact.minute_delta.const(1)  # через минуту = +1 минута к дате
+        )
+    ).optional(),
+)
+
+SOME_TIME_AGO = rule(
+    or_(
+        rule(  # "X часов назад", где X словом или числом = вычесть из текущего времени X часов
+            or_(HOUR_DELTA_DIGITS_NEG, HOUR_DELTA_WORDS_NEG),
+            morph_pipeline(WORD_HOUR),  # "часов"
+        ),
+        rule(  # "X с половиной часов назад", где X словом или числом = вычесть из текущего времени X часов 30 минут
+            or_(HOUR_DELTA_DIGITS_NEG, HOUR_DELTA_WORDS_NEG),
+            eq('с'),
+            morph_pipeline(WORD_HALF).interpretation(
+                DateTimeFact.minute_delta.const(-30)
+            ),  # "с половиной"
+            morph_pipeline(WORD_HOUR),  # "часов"
+        ),
+        # просто "час назад"
+        morph_pipeline(WORD_HOUR).interpretation(
+            DateTimeFact.hour_delta.const(-1)  # час назад = -1 час к дате
+        ),
+        # "полчаса назад"
+        or_(
+            rule(
+                morph_pipeline(PREFIX_HALF),
+                morph_pipeline(WORD_HOUR)
+            ),
+            morph_pipeline(WORD_HALFHOUR),
+        ).interpretation(
+            DateTimeFact.minute_delta.const(-30)  # полчаса назад = -30 минут к дате
+        ),
+    ).optional(),
+    or_(
+        rule(  # "X минут назад", где X словом или числом = вычесть из текущего времени X минут
+            or_(MINUTE_DELTA_DIGITS_NEG, MINUTE_DELTA_WORDS_NEG),
+            morph_pipeline(WORD_MINUTE),  # "минут"
+        ),
+        # просто "минуту назад"
+        morph_pipeline(WORD_MINUTE).interpretation(
+            DateTimeFact.minute_delta.const(-1)  # минуту назад = -1 минута к дате
         )
     ).optional(),
 )

@@ -5,20 +5,29 @@ from yargy import (
 from yargy.pipelines import morph_pipeline
 from yargy.predicates import (
     eq, gte, lte, length_eq,
-    dictionary, )
+)
 
 from .facts import *
 from .words import *
 
-__all__ = ['AFTER_SOME_YEARS', 'YEAR_NUMBER', 'YEAR_NUMBER_LONG']
+__all__ = ['AFTER_SOME_YEARS', 'SOME_YEARS_AGO',
+           'YEAR_NUMBER', 'YEAR_NUMBER_LONG']
 
 # *три* года
-YEAR_COUNT_WORDS = dictionary(WORD_COUNTS).interpretation(
+YEAR_COUNT_WORDS = morph_pipeline(WORD_COUNTS).interpretation(
     DateTimeFact.year_delta.normalized().custom(WORD_COUNTS.__getitem__)
 )
 # *3* года
 YEAR_COUNT_DIGITS = gte(1).interpretation(
     DateTimeFact.year_delta.custom(int)
+)
+# *три* года назад
+YEAR_COUNT_WORDS_NEG = morph_pipeline(WORD_COUNTS).interpretation(
+    DateTimeFact.year_delta.normalized().custom(lambda s: -WORD_COUNTS[s])
+)
+# *3* года назад
+YEAR_COUNT_DIGITS_NEG = gte(1).interpretation(
+    DateTimeFact.year_delta.custom(lambda s: -int(s))
 )
 # *2020* год
 YEAR_NUMBER_LONG = rule(
@@ -51,6 +60,19 @@ AFTER_SOME_YEARS = rule(
         # просто "через год"
         morph_pipeline(WORD_YEAR).interpretation(
             DateTimeFact.year_delta.const(1)  # через год = +1 год к дате
+        )
+    )
+)
+
+SOME_YEARS_AGO = rule(
+    or_(
+        rule(  # "X лет назад", где X словом или числом = вычесть из текущей даты X лет
+            or_(YEAR_COUNT_DIGITS_NEG, YEAR_COUNT_WORDS_NEG),
+            morph_pipeline(WORD_YEAR),  # "год"
+        ),
+        # просто "год назад"
+        morph_pipeline(WORD_YEAR).interpretation(
+            DateTimeFact.year_delta.const(-1)  # год назад = -1 год к дате
         )
     )
 )

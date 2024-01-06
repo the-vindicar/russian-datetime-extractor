@@ -4,23 +4,31 @@ from yargy import (
 )
 from yargy.pipelines import morph_pipeline
 from yargy.predicates import (
-    eq, gte, lte, dictionary, )
+    eq, gte, lte, )
 
 from .facts import *
 from .words import *
 
-__all__ = ['AFTER_SOME_DAYS', 'DAY_NUMBER', 'SPECIAL_DAY_NAMES']
+__all__ = ['AFTER_SOME_DAYS', 'SOME_DAYS_AGO', 'DAY_NUMBER', 'SPECIAL_DAY_NAMES']
 
 # *три* дня
-DAY_COUNT_WORDS = dictionary(WORD_COUNTS).interpretation(
+DAY_COUNT_WORDS = morph_pipeline(WORD_COUNTS).interpretation(
     DateTimeFact.day_delta.normalized().custom(WORD_COUNTS.__getitem__)
 )
 # *3* дня
 DAY_COUNT_DIGITS = gte(1).interpretation(
     DateTimeFact.day_delta.custom(int)
 )
+# *три* дня назад
+DAY_COUNT_WORDS_NEG = morph_pipeline(WORD_COUNTS).interpretation(
+    DateTimeFact.day_delta.normalized().custom(lambda s: -int(WORD_COUNTS[s]))
+)
+# *3* дня назад
+DAY_COUNT_DIGITS_NEG = gte(1).interpretation(
+    DateTimeFact.day_delta.custom(lambda s: -int(s))
+)
 # *третье* число
-DAY_NUMBER_WORDS = dictionary(WORD_ENUMERATIONS).interpretation(
+DAY_NUMBER_WORDS = morph_pipeline(WORD_ENUMERATIONS).interpretation(
     DateTimeFact.day.normalized().custom(WORD_ENUMERATIONS.__getitem__)
 )
 # *3* число
@@ -53,5 +61,21 @@ AFTER_SOME_DAYS = rule(
             )
         )
     )
+
+SOME_DAYS_AGO = rule(
+        or_(
+            rule(  # "X дней назад", где X словом или числом = вычесть из текущей даты X+1
+                or_(DAY_COUNT_DIGITS_NEG, DAY_COUNT_WORDS_NEG).interpretation(
+                    DateTimeFact.day_delta.custom(lambda i: int(i) - 1)
+                ),
+                morph_pipeline(WORD_DAY),  # "дней"
+            ),
+            # просто "день тому назад"
+            morph_pipeline(WORD_DAY).interpretation(
+                DateTimeFact.day_delta.const(-2)  # один день назад = позавчера = -2 дня к дате
+            )
+        )
+    )
+
 
 DAY_NUMBER = or_(DAY_NUMBER_WORDS, DAY_NUMBER_DIGITS)

@@ -7,12 +7,12 @@ from yargy.predicates import (
     eq, )
 
 from .facts import DateTimeFact
-from .grammar_days import AFTER_SOME_DAYS, DAY_NUMBER, SPECIAL_DAY_NAMES
-from .grammar_months import AFTER_SOME_MONTHS, MONTH_NAME, MONTH_NUMBER
-from .grammar_time import AFTER_SOME_TIME, TIME
+from .grammar_days import AFTER_SOME_DAYS, SOME_DAYS_AGO, DAY_NUMBER, SPECIAL_DAY_NAMES
+from .grammar_months import AFTER_SOME_MONTHS, SOME_MONTHS_AGO, MONTH_NAME, MONTH_NUMBER
+from .grammar_time import AFTER_SOME_TIME, SOME_TIME_AGO, TIME
 from .grammar_weekdays import WEEKDAY
-from .grammar_weeks import AFTER_SOME_WEEKS
-from .grammar_years import AFTER_SOME_YEARS, YEAR_NUMBER, YEAR_NUMBER_LONG
+from .grammar_weeks import AFTER_SOME_WEEKS, SOME_WEEKS_AGO
+from .grammar_years import AFTER_SOME_YEARS, SOME_YEARS_AGO, YEAR_NUMBER, YEAR_NUMBER_LONG
 from .words import *
 
 INTERVAL_JOIN = or_(*[eq(w) for w in WORD_JOIN])
@@ -47,6 +47,38 @@ AFTER_INTERVAL = rule(
         AFTER_SOME_YEARS,
     ),
 )
+
+TIME_INTERVAL_AGO = rule(
+    SOME_YEARS_AGO.optional(),
+    INTERVAL_JOIN.optional(),
+    SOME_MONTHS_AGO.optional(),
+    INTERVAL_JOIN.optional(),
+    SOME_DAYS_AGO.optional(),
+    INTERVAL_JOIN.optional(),
+    SOME_TIME_AGO,
+    morph_pipeline(WORD_AGO)  # "назад", "тому назад"
+)
+
+INTERVAL_AGO = rule(
+    or_(
+        SOME_WEEKS_AGO,
+        rule(
+            SOME_YEARS_AGO.optional(),
+            INTERVAL_JOIN.optional(),
+            SOME_MONTHS_AGO.optional(),
+            INTERVAL_JOIN.optional(),
+            SOME_DAYS_AGO,
+        ),
+        rule(
+            SOME_YEARS_AGO.optional(),
+            INTERVAL_JOIN.optional(),
+            SOME_MONTHS_AGO,
+        ),
+        SOME_YEARS_AGO,
+    ),
+    morph_pipeline(WORD_AGO)  # "назад", "тому назад"
+)
+
 # прямые варианты задания даты
 DATE_SPEC = or_(
     or_(  # задание даты числами
@@ -88,6 +120,7 @@ DATE_SPEC = or_(
 # обобщённые варианты задания даты
 DATE = or_(
     AFTER_INTERVAL,  # через N дней и т.п.
+    INTERVAL_AGO,  # N дней тому назад и т.п.
     SPECIAL_DAY_NAMES,  # сегодня, завтра и т.п.
     rule(WEEKDAY, eq(',').optional(), DATE_SPEC),  # четверг, четвёртого числа
     rule(  # четвёртого числа, в четверг
@@ -101,6 +134,7 @@ DATE = or_(
 # обобщённая грамматика задания даты и времени
 DATETIME = or_(
     AFTER_TIME_INTERVAL,  # через три часа
+    TIME_INTERVAL_AGO,  # три часа назад
     TIME,  # в три часа
     rule(  # четвёртого января, в три часа
         DATE,
