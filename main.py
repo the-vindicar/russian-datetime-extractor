@@ -1,6 +1,6 @@
 import locale
 from datetime import datetime
-from date_extracting import DateTime
+from date_extracting import DateTime, BindType
 
 texts = [
     "Мероприятие начнётся 21 декабря 2023, в 12 часов 00 минут.",
@@ -21,7 +21,7 @@ locale.setlocale(0, 'RU-ru')
 now = datetime.now()
 
 for text in texts:
-    results = DateTime.extract(text, now)
+    results = DateTime.extract(text, BindType.FUTURE, now)
     print('[+]' if len(results) == 1 else '[-]', text)
     for r in results:
         dt = r.datetime.strftime('%A, %d %B %Y, %H:%M' if r.has_time else '%A, %d %B %Y')

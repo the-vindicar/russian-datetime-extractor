@@ -10,7 +10,7 @@ class BindType(enum.Enum):
     CLOSEST = 0
     FUTURE = 1
 
-def bind_reference(fact: DateTimeObj, origin: datetime) -> tp.Tuple[datetime, bool]:
+def bind_reference(fact: DateTimeObj, direction: BindType, origin: datetime) -> tp.Tuple[datetime, bool]:
     """
     Преобразует извлечённый факт в описание даты и (опционально) времени c учётом
     заданной точки отсчёта. При неоднозначном указании (например, только число)
@@ -22,13 +22,26 @@ def bind_reference(fact: DateTimeObj, origin: datetime) -> tp.Tuple[datetime, bo
     :return: Точное указание на дату/время, а также флаг наличия времени.
     """
     target = origin
-    if fact.has_delta:
-        # было задано хотя бы одно относительное значение - учитываем их
-        target = _bind_relative_future(fact, origin)
-    # теперь пытаемся использовать абсолютные значения даты, если они есть
-    target = _bind_absolute_date_future(fact, origin, target)
-    # разбираемся со временем
-    target = _bind_absolute_time_future(fact, origin, target)
+    if direction == BindType.FUTURE:
+        if fact.has_delta:
+            # было задано хотя бы одно относительное значение - учитываем их
+            target = _bind_relative_future(fact, origin)
+        # теперь пытаемся использовать абсолютные значения даты, если они есть
+        target = _bind_absolute_date_future(fact, origin, target)
+        # разбираемся со временем
+        target = _bind_absolute_time_future(fact, origin, target)
+    elif direction == BindType.PAST:
+        if fact.has_delta:
+            # было задано хотя бы одно относительное значение - учитываем их
+            target = _bind_relative_past(fact, origin)
+        # теперь пытаемся использовать абсолютные значения даты, если они есть
+        target = _bind_absolute_date_past(fact, origin, target)
+        # разбираемся со временем
+        target = _bind_absolute_time_past(fact, origin, target)
+    else:
+        future, _ = bind_reference(fact, BindType.FUTURE, origin)
+        past, _ = bind_reference(fact, BindType.PAST, origin)
+        target = min([future, past], key=lambda dt: abs((dt - origin).total_seconds()))
     if not fact.has_time:
         target = target.replace(hour=0, minute=0)
     return target, fact.has_time
@@ -87,8 +100,8 @@ def _bind_absolute_time_past(fact: DateTimeObj, origin: datetime, target: dateti
                 hour=(fact.hour + 12) if 1 <= fact.hour <= 8 else fact.hour,
                 minute=fact.minute or 0
             )
-        if not fact.has_date and (target.hour * 60 + target.minute) >= (origin.hour * 60 + origin.minute):
-            # видим время, большее или равное текущему - но при этом дата не указана
+        if not fact.has_date and (target.hour * 60 + target.minute) > (origin.hour * 60 + origin.minute):
+            # видим время, большее текущего - но при этом дата не указана
             # считаем,что это указание на вчерашний день
             target -= timedelta(days=1)
     return target
@@ -158,21 +171,29 @@ def _bind_absolute_date_past(fact: DateTimeObj, origin: datetime, target: dateti
     return datetime(year=year, month=month, day=day, hour=hour, minute=minute)
 
 
-def _bind_relative_future(fact: DateTimeObj, origin: datetime) -> datetime:
-    """Выполняет расчёт относительно указанного времени с прицелом на будущее."""
+def _bind_relative(fact: DateTimeObj, origin: datetime) -> datetime:
     dyear: int = fact.year_delta or 0
     dmonth: int = fact.month_delta or 0
     try:
         target: datetime = origin.replace(
-            year=origin.year + dyear + (1 if (dmonth + origin.month) > 12 else 0),
-            month=(origin.month - 1 + dmonth) % 12 + 1
+            year=origin.year + dyear + (dmonth + origin.month - 1) // 12,
+            month=(dmonth + origin.month - 1) % 12 + (1 if dmonth >= 0 else 0)
         )
     except ValueError:  # 31 января + через месяц = ~1 марта а не 31 февраля
         target: datetime = origin.replace(
-            year=origin.year + dyear + (1 if (dmonth + origin.month) > 12 else 0),
-            month=(origin.month - 1 + dmonth + 1) % 12 + 1,
+            year=origin.year + dyear + (dmonth + origin.month - 1) // 12,
+            month=(origin.month - 1 + dmonth) % 12 + (2 if dmonth >= 0 else 1),
             day=1
         )
+    target = target + timedelta(
+        hours=fact.hour_delta or 0,
+        minutes=fact.minute_delta or 0
+    )
+    return target
+
+def _bind_relative_future(fact: DateTimeObj, origin: datetime) -> datetime:
+    """Выполняет расчёт относительно указанного времени с прицелом на будущее."""
+    target = _bind_relative(fact, origin)
     if not fact.day_delta and fact.dow:
         # есть указание на день недели, но не на день
         if fact.week is None:  # неделя не указана - ищем с завтрашнего дня
@@ -190,35 +211,19 @@ def _bind_relative_future(fact: DateTimeObj, origin: datetime) -> datetime:
             raise ValueError('Impossible dow value!')
     else:  # есть указание на день, или ни на то ни на другое
         target = target + timedelta(days=fact.day_delta or 0)
-    target = target + timedelta(
-        hours=fact.hour_delta or 0,
-        minutes=fact.minute_delta or 0
-    )
     return target
 
 
 def _bind_relative_past(fact: DateTimeObj, origin: datetime) -> datetime:
     """Выполняет расчёт относительно указанного времени с прицелом на прошлое."""
-    dyear: int = fact.year_delta or 0
-    dmonth: int = fact.month_delta or 0
-    try:
-        target: datetime = origin.replace(
-            year=origin.year + dyear - (1 if (dmonth + origin.month) < 1 else 0),
-            month=(origin.month - 1 + dmonth + 12) % 12 + 1
-        )
-    except ValueError:  # 30 марта + месяц назад = ~1 марта а не 30 февраля
-        target: datetime = origin.replace(
-            year=origin.year + dyear - (1 if (dmonth + origin.month) < 1 else 0),
-            month=(origin.month - 1 + dmonth + 12) % 12 + 1,
-            day=1
-        )
+    target = _bind_relative(fact, origin)
     if not fact.day_delta and fact.dow:
         # есть указание на день недели, но не на день
         if fact.week is None:  # неделя не указана - ищем с вчерашнего дня
             target = target + timedelta(days=-1)
-        else:  # неделя указана - ищем с понедельника этой недели
-            while target.weekday() > 0:
-                target -= timedelta(days=1)
+        else:  # неделя указана - ищем с воскресенья этой недели
+            while target.weekday() < 6:
+                target += timedelta(days=1)
             target = target + timedelta(weeks=fact.week)
         for _ in range(8):  # ищем день, приходящийся на нужный день недели
             if target.weekday() == fact.dow:
@@ -229,8 +234,4 @@ def _bind_relative_past(fact: DateTimeObj, origin: datetime) -> datetime:
             raise ValueError('Impossible dow value!')
     else:  # есть указание на день, или ни на то ни на другое
         target = target + timedelta(days=fact.day_delta or 0)
-    target = target + timedelta(
-        hours=fact.hour_delta or 0,
-        minutes=fact.minute_delta or 0
-    )
     return target

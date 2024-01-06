@@ -514,7 +514,7 @@ SAMPLES: dict[str, tuple[DateTimeObj, dict[BindType, str]]] = {
         {
             BindType.FUTURE: "2023-12-31 00:00",  # 00:00 сегодня уже было - завтра
             BindType.PAST: "2023-12-30 00:00",  # 00:00 сегодня уже было - сегодня
-            BindType.CLOSEST: "2023-12-30 00:00",
+            BindType.CLOSEST: "2023-12-31 00:00",  # после полудня - следующая полночь ближе
         }
     ),
     "во вторник": (

@@ -2,7 +2,7 @@ import typing as tp
 import dataclasses
 from datetime import datetime
 from .extractor import DateTimeExtractor
-from .binding import bind_reference
+from .binding import bind_reference, BindType
 
 __all__ = ['DateTime']
 
@@ -33,11 +33,24 @@ class DateTime:
     _extractor: tp.ClassVar[DateTimeExtractor] = DateTimeExtractor()
 
     @classmethod
-    def extract(cls: tp.Type[_DT], text: str, origin: datetime) -> tp.List[_DT]:
+    def extract(cls: tp.Type[_DT], text: str, direction: BindType, origin: datetime) -> tp.List[_DT]:
+        """
+        Извлекает из предложенного текста все отсылки к дате и времени.
+        Отсылки привязываются к указанной точке отсчёта, используя указанное предпочтительное направление во времени.
+        * BindType.FUTURE - поиск ведётся в будущее, если только явно не указана дата в прошлом.
+        * BindType.PAST - поиск ведётся в прошлое, если только явно не указана дата в будущем.
+        * BindType.CLOSEST - поиск ведётся в обе стороны, возвращается ближайшее из двух значений.
+        При равной дистанции возвращается дата в будущем.
+
+        :param text: Текст, из которого извлекаются упоминания даты и времени.
+        :param direction: Направление, в котором ведётся поиск подходящей даты для неоднозначного упоминания.
+        :param origin: точка отсчёта, относительно которой вычисляется дата.
+        :return: Список найденных дат, с указанием на наличие времени и подстроку, которая их содержит.
+        """
         results = []
         for match in cls._extractor(text):
             substr = text[match.start:match.stop]
-            dt, has_time = bind_reference(match.fact, origin)
+            dt, has_time = bind_reference(match.fact, direction, origin)
             results.append(cls(
                 datetime=dt,
                 has_time=has_time,
