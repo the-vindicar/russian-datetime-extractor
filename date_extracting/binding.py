@@ -1,8 +1,14 @@
 """Реализует процесс "подгонки" извлечённого факта к выбранной точке отсчёта во времени."""
 import typing as tp
 from datetime import datetime, timedelta
+import enum
 from .facts import DateTimeObj, TimeSpecType
 
+
+class BindType(enum.Enum):
+    PAST = -1
+    CLOSEST = 0
+    FUTURE = 1
 
 def bind_reference(fact: DateTimeObj, origin: datetime) -> tp.Tuple[datetime, bool]:
     """
@@ -15,54 +21,86 @@ def bind_reference(fact: DateTimeObj, origin: datetime) -> tp.Tuple[datetime, bo
     :raises ValueError: Если полученный факт невозможно интерпретировать однозначно.
     :return: Точное указание на дату/время, а также флаг наличия времени.
     """
-    year = origin.year
-    month = origin.month
-    day = origin.day
-    hour = origin.hour
-    minute = origin.minute
+    target = origin
     if fact.has_delta:
         # было задано хотя бы одно относительное значение - учитываем их
-        dyear: int = fact.year_delta or 0
-        dmonth: int = fact.month_delta or 0
-        try:
-            target: datetime = origin.replace(
-                year=origin.year + dyear + (1 if (dmonth + origin.month) > 12 else 0),
-                month=(origin.month - 1 + dmonth) % 12 + 1
-            )
-        except ValueError:  # 31 января + через месяц = ~1 марта а не 31 февраля
-            target: datetime = origin.replace(
-                year=origin.year + dyear + (1 if (dmonth + origin.month) > 12 else 0),
-                month=(origin.month - 1 + dmonth + 1) % 12 + 1,
-                day=1
-            )
-
-        if not fact.day_delta and fact.dow:
-            # есть указание на день недели, но не на день
-            if fact.week is None:  # неделя не указана - ищем с завтрашнего дня
-                target = target + timedelta(days=1)
-            else:  # неделя указана - ищем с понедельника этой недели
-                while target.weekday() > 0:
-                    target -= timedelta(days=1)
-                target = target + timedelta(weeks=fact.week)
-            for _ in range(8):  # ищем день, приходящийся на нужный день недели
-                if target.weekday() == fact.dow:
-                    break
-                else:
-                    target += timedelta(days=1)
-            else:
-                raise ValueError('Impossible dow value!')
-        else:  #есть указание на день, или ни на то ни на другое
-            target = target + timedelta(days=fact.day_delta or 0)
-        target = target + timedelta(
-            hours=fact.hour_delta or 0,
-            minutes=fact.minute_delta or 0
-        )
-        year = target.year
-        month = target.month
-        day = target.day
-        hour = target.hour
-        minute = target.minute
+        target = _bind_relative_future(fact, origin)
     # теперь пытаемся использовать абсолютные значения даты, если они есть
+    target = _bind_absolute_date_future(fact, origin, target)
+    # разбираемся со временем
+    target = _bind_absolute_time_future(fact, origin, target)
+    if not fact.has_time:
+        target = target.replace(hour=0, minute=0)
+    return target, fact.has_time
+
+
+def _bind_absolute_time_future(fact: DateTimeObj, origin: datetime, target: datetime) -> datetime:
+    """Учитывает абсолютные значения времени, если они заданы, с прицелом на будущее."""
+    if fact.minute is not None and fact.hour is None:  # заданы минуты, но не час
+        target = target.replace(hour=origin.hour, minute=fact.minute)
+        if fact.minute < origin.minute:  # минуты меньше текущих - должен быть следующий час
+            target += timedelta(hours=1)
+    elif fact.hour is not None:  # задан хотя бы час
+        if fact.spec == TimeSpecType.PRECISE:  # время задано точно, как 5:43
+            target = target.replace(hour=fact.hour, minute=fact.minute or 0)
+        elif fact.spec == TimeSpecType.AM:  # "в N часов ночи/утра"
+            target = target.replace(hour=fact.hour, minute=fact.minute or 0)
+        elif fact.spec == TimeSpecType.PM:  # "в N часов дня/вечера"
+            target = target.replace(
+                hour=(fact.hour + 12) if (fact.hour < 12) else fact.hour,
+                minute=fact.minute or 0
+            )
+        else:  # fact.spec == None:  # требуется уточнение
+            # всё что от 1 до 8 часов включительно - день и вечер.
+            # всё остальное - утро (10 часов), или явно заданный час (0 часов, 14 часов)
+            target = target.replace(
+                hour=(fact.hour + 12) if 1 <= fact.hour <= 8 else fact.hour,
+                minute=fact.minute or 0
+            )
+        if not fact.has_date and (target.hour * 60 + target.minute) <= (origin.hour * 60 + origin.minute):
+            # планируем на время, меньшее или равное текущему - но при этом дата не указана
+            # считаем,что это план на завтра
+            target += timedelta(days=1)
+    return target
+
+
+def _bind_absolute_time_past(fact: DateTimeObj, origin: datetime, target: datetime) -> datetime:
+    """Учитывает абсолютные значения времени, если они заданы, с прицелом на прошлое."""
+    if fact.minute is not None and fact.hour is None:  # заданы минуты, но не час
+        target = target.replace(hour=origin.hour, minute=fact.minute)
+        if fact.minute > origin.minute:  # минуты больше текущих - должен быть предыдущий час
+            target -= timedelta(hours=1)
+    elif fact.hour is not None:  # задан хотя бы час
+        if fact.spec == TimeSpecType.PRECISE:  # время задано точно, как 5:43
+            target = target.replace(hour=fact.hour, minute=fact.minute or 0)
+        elif fact.spec == TimeSpecType.AM:  # "в N часов ночи/утра"
+            target = target.replace(hour=fact.hour, minute=fact.minute or 0)
+        elif fact.spec == TimeSpecType.PM:  # "в N часов дня/вечера"
+            target = target.replace(
+                hour=(fact.hour + 12) if (fact.hour < 12) else fact.hour,
+                minute=fact.minute or 0
+            )
+        else:  # fact.spec == None:  # требуется уточнение
+            # всё что от 1 до 8 часов включительно - день и вечер.
+            # всё остальное - утро (10 часов), или явно заданный час (0 часов, 14 часов)
+            target = target.replace(
+                hour=(fact.hour + 12) if 1 <= fact.hour <= 8 else fact.hour,
+                minute=fact.minute or 0
+            )
+        if not fact.has_date and (target.hour * 60 + target.minute) >= (origin.hour * 60 + origin.minute):
+            # видим время, большее или равное текущему - но при этом дата не указана
+            # считаем,что это указание на вчерашний день
+            target -= timedelta(days=1)
+    return target
+
+
+def _bind_absolute_date_future(fact: DateTimeObj, origin: datetime, target: datetime) -> datetime:
+    """Учитывает абсолютные значения даты, если они заданы, с прицелом на будущее."""
+    year = target.year
+    month = target.month
+    day = target.day
+    hour = target.hour
+    minute = target.minute
     if not fact.day and (fact.month or fact.year):  # не указан день, но есь месяц или год
         day = min(day, 28) if fact.month else day
         month = fact.month or month
@@ -85,43 +123,114 @@ def bind_reference(fact: DateTimeObj, origin: datetime) -> tp.Tuple[datetime, bo
         day = fact.day
         month = fact.month
         year = fact.year
-    # разбираемся со временем
-    if fact.minute is not None and fact.hour is None:  # заданы минуты, но не час
-        target = datetime(year=year, month=month, day=day, hour=origin.hour, minute=fact.minute)
-        if fact.minute < origin.minute:  # минуты меньше текущих - должен быть следующий час
-            target += timedelta(hours=1)
-        year = target.year
-        month = target.month
-        day = target.day
-        hour = target.hour
-        minute = target.minute
-    elif fact.hour is not None:  # задан хотя бы час
-        if fact.spec == TimeSpecType.PRECISE:  # время задано точно, как 5:43
-            hour = fact.hour
-            minute = fact.minute or 0
-        elif fact.spec == TimeSpecType.AM:  # "в N часов ночи/утра"
-            hour = fact.hour
-            minute = fact.minute or 0
-        elif fact.spec == TimeSpecType.PM:  # "в N часов дня/вечера"
-            hour = (fact.hour + 12) if (fact.hour < 12) else fact.hour
-            minute = fact.minute or 0
-        else:  # fact.spec == None:  # требуется уточнение
-            # всё что от 1 до 8 часов включительно - день и вечер.
-            # всё остальное - утро (10 часов), или явно заданный час (0 часов, 14 часов)
-            hour = (fact.hour + 12) if 1 <= fact.hour <= 8 else fact.hour
-            minute = fact.minute or 0
-        if not fact.has_date and (hour*60+minute) <= (origin.hour*60 + origin.minute):
-            # планируем на время, меньшее или равное текущему - но при этом дата не указана
-            # считаем,что это план на завтра
-            target = datetime(year=year, month=month, day=day, hour=hour, minute=fact.minute or 0)
-            target += timedelta(days=1)
-            year = target.year
-            month = target.month
-            day = target.day
-            hour = target.hour
-            minute = target.minute
-    if not fact.has_time:
-        hour = 0
-        minute = 0
-    target = datetime(year=year, month=month, day=day, hour=hour, minute=minute)
-    return target, fact.has_time
+    return datetime(year=year, month=month, day=day, hour=hour, minute=minute)
+
+
+def _bind_absolute_date_past(fact: DateTimeObj, origin: datetime, target: datetime) -> datetime:
+    """Учитывает абсолютные значения даты, если они заданы, с прицелом на прошлое."""
+    year = target.year
+    month = target.month
+    day = target.day
+    hour = target.hour
+    minute = target.minute
+    if not fact.day and (fact.month or fact.year):  # не указан день, но есть месяц или год
+        day = min(day, 28) if fact.month else day
+        month = fact.month or month
+        year = fact.year or year
+    elif fact.day and not fact.month and not fact.year:  # задан только день
+        if fact.day > origin.day:  # число больше сегодняшнего - это должен быть предыдущий месяц
+            if month > 1:
+                month = origin.month + 1
+            else:
+                month = 12
+                year = origin.year - 1
+        day = fact.day
+    elif fact.day and fact.month and not fact.year:  # задан день и месяц
+        if (fact.month > origin.month) or (fact.month == origin.month and fact.day > origin.day):
+            # месяц больше текущего - должен быть предыдущий год
+            year = origin.year - 1
+        day = fact.day
+        month = fact.month
+    elif fact.day and fact.month and fact.year:  # дата задана полностью
+        day = fact.day
+        month = fact.month
+        year = fact.year
+    return datetime(year=year, month=month, day=day, hour=hour, minute=minute)
+
+
+def _bind_relative_future(fact: DateTimeObj, origin: datetime) -> datetime:
+    """Выполняет расчёт относительно указанного времени с прицелом на будущее."""
+    dyear: int = fact.year_delta or 0
+    dmonth: int = fact.month_delta or 0
+    try:
+        target: datetime = origin.replace(
+            year=origin.year + dyear + (1 if (dmonth + origin.month) > 12 else 0),
+            month=(origin.month - 1 + dmonth) % 12 + 1
+        )
+    except ValueError:  # 31 января + через месяц = ~1 марта а не 31 февраля
+        target: datetime = origin.replace(
+            year=origin.year + dyear + (1 if (dmonth + origin.month) > 12 else 0),
+            month=(origin.month - 1 + dmonth + 1) % 12 + 1,
+            day=1
+        )
+    if not fact.day_delta and fact.dow:
+        # есть указание на день недели, но не на день
+        if fact.week is None:  # неделя не указана - ищем с завтрашнего дня
+            target = target + timedelta(days=1)
+        else:  # неделя указана - ищем с понедельника этой недели
+            while target.weekday() > 0:
+                target -= timedelta(days=1)
+            target = target + timedelta(weeks=fact.week)
+        for _ in range(8):  # ищем день, приходящийся на нужный день недели
+            if target.weekday() == fact.dow:
+                break
+            else:
+                target += timedelta(days=1)
+        else:
+            raise ValueError('Impossible dow value!')
+    else:  # есть указание на день, или ни на то ни на другое
+        target = target + timedelta(days=fact.day_delta or 0)
+    target = target + timedelta(
+        hours=fact.hour_delta or 0,
+        minutes=fact.minute_delta or 0
+    )
+    return target
+
+
+def _bind_relative_past(fact: DateTimeObj, origin: datetime) -> datetime:
+    """Выполняет расчёт относительно указанного времени с прицелом на прошлое."""
+    dyear: int = fact.year_delta or 0
+    dmonth: int = fact.month_delta or 0
+    try:
+        target: datetime = origin.replace(
+            year=origin.year + dyear - (1 if (dmonth + origin.month) < 1 else 0),
+            month=(origin.month - 1 + dmonth + 12) % 12 + 1
+        )
+    except ValueError:  # 30 марта + месяц назад = ~1 марта а не 30 февраля
+        target: datetime = origin.replace(
+            year=origin.year + dyear - (1 if (dmonth + origin.month) < 1 else 0),
+            month=(origin.month - 1 + dmonth + 12) % 12 + 1,
+            day=1
+        )
+    if not fact.day_delta and fact.dow:
+        # есть указание на день недели, но не на день
+        if fact.week is None:  # неделя не указана - ищем с вчерашнего дня
+            target = target + timedelta(days=-1)
+        else:  # неделя указана - ищем с понедельника этой недели
+            while target.weekday() > 0:
+                target -= timedelta(days=1)
+            target = target + timedelta(weeks=fact.week)
+        for _ in range(8):  # ищем день, приходящийся на нужный день недели
+            if target.weekday() == fact.dow:
+                break
+            else:
+                target -= timedelta(days=1)
+        else:
+            raise ValueError('Impossible dow value!')
+    else:  # есть указание на день, или ни на то ни на другое
+        target = target + timedelta(days=fact.day_delta or 0)
+    target = target + timedelta(
+        hours=fact.hour_delta or 0,
+        minutes=fact.minute_delta or 0
+    )
+    return target
