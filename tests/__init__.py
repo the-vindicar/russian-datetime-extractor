@@ -24,9 +24,10 @@ class TestExtraction(unittest.TestCase):
         """Каждый пример должен содержать одно и только одно описание даты/времени."""
         for text, (fact, groundtruth) in SAMPLES.items():
             with self.subTest(msg=text):  # позволяет понять, какой элемент списка тестов дал ошибку
-                groundtruthvalue = datetime.fromisoformat(groundtruth)
-                matches = list(self.extractor(text))
-                self.assertEqual(len(matches), 1)
-                self.assertEqual(repr(fact), repr(matches[0].fact))  # проверяем извлечение
-                value, has_time = bind_reference(matches[0].fact, ORIGIN)
-                self.assertEqual(groundtruthvalue, value)  # проверяем привязку
+                for btype, gtvalue in groundtruth.items():
+                    groundtruthvalue = datetime.fromisoformat(gtvalue)
+                    matches = list(self.extractor(text))
+                    self.assertEqual(len(matches), 1)
+                    self.assertEqual(repr(fact), repr(matches[0].fact))  # проверяем извлечение
+                    value, has_time = bind_reference(matches[0].fact, ORIGIN)
+                    self.assertEqual(groundtruthvalue, value)  # проверяем привязку
