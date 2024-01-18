@@ -1,5 +1,6 @@
 """Содержит описания факта о дате/времени, извлечённого из текста,
 а также вспомогательных классов."""
+from typing import Optional
 import enum
 
 from yargy.interpretation import fact
@@ -40,7 +41,7 @@ class DateTimeObj(obj.Obj):
         - AM - ночь/утро
         - PM - день/вечер
         - PRECISE - время задано точно, в виде "9:00" или похожем
-        - не задано (None) - указание требует уточнения ("в два часа").
+        - не задано (None) - указание неоднозначно ("в два часа").
     year_delta - смещение по годам ("спустя год").
     month_delta - смещение по месяцам.
     day_delta - смещение по дням.
@@ -55,37 +56,38 @@ class DateTimeObj(obj.Obj):
         'hour_delta', 'minute_delta'
     ]
 
-    year: int
-    month: int
-    day: int
-    week: int
-    dow: int
-    hour: int
-    minute: int
-    spec: TimeSpecType
-    year_delta: int
-    month_delta: int
-    day_delta: int
-    hour_delta: int
-    minute_delta: int
+    year: Optional[int]
+    month: Optional[int]
+    day: Optional[int]
+    week: Optional[int]
+    dow: Optional[int]
+    hour: Optional[int]
+    minute: Optional[int]
+    spec: Optional[TimeSpecType]
+    year_delta: Optional[int]
+    month_delta: Optional[int]
+    day_delta: Optional[int]
+    hour_delta: Optional[int]
+    minute_delta: Optional[int]
 
     @property
     def has_delta(self) -> bool:
         """Возвращает True, если факт содержит относительные указания на дату и/или время."""
-        values = [self.year_delta, self.month_delta, self.day_delta, self.dow, self.hour_delta, self.minute_delta]
-        return any(values)
+        values = (self.year_delta, self.month_delta, self.day_delta, self.dow,
+                  self.hour_delta, self.minute_delta)
+        return any(v is not None for v in values)
 
     @property
     def has_date(self) -> bool:
         """Возвращает True, если факт содержит абсолютное или относительное указание на дату."""
-        values = [self.year_delta, self.month_delta, self.day_delta, self.dow,
-                  self.year, self.month, self.day]
-        return any(values)
+        values = (self.year_delta, self.month_delta, self.day_delta, self.dow,
+                  self.year, self.month, self.day)
+        return any(v is not None for v in values)
 
     @property
     def has_time(self) -> bool:
         """Возвращает True, если факт содержит абсолютное или относительное указание на время."""
-        values = [self.hour_delta, self.minute_delta, self.hour, self.minute]
+        values = (self.hour_delta, self.minute_delta, self.hour, self.minute)
         return any(d is not None for d in values)
 
 
